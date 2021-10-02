@@ -23,10 +23,10 @@ const userRoutes = require("./routes/users.routes");
 
 const MongoStore = require("connect-mongo");
 
-const dbUrl = process.env.DB_URL;
-const localDbUrl = "mongodb://localhost:27017/yelp-camp";
+const dbUrl = process.env.DB_URL || "mongodb://localhost:27017/yelp-camp";
+//const localDbUrl = "mongodb://localhost:27017/yelp-camp";
 
-mongoose.connect(localDbUrl);
+mongoose.connect(dbUrl);
 
 const db = mongoose.connection;
 db.on("error", console.error.bind(console, "connection error:"));
@@ -45,11 +45,13 @@ app.use(methodOverride("_method"));
 app.use(express.static(path.join(__dirname, "public")));
 app.use(mongoSanitize());
 
+const secret = process.env.SECRET || "thisisabadsecret";
+
 const store = MongoStore.create({
-  mongoUrl: localDbUrl,
+  mongoUrl: dbUrl,
   touchAfter: 24 * 60 * 60,
   crypto: {
-    secret: "thisisabadsecret",
+    secret,
   },
 });
 
@@ -60,7 +62,7 @@ store.on("error", function (e) {
 const sessionConfig = {
   store,
   name: "yelpsession",
-  secret: "thisisabadsecret",
+  secret,
   resave: false,
   saveUninitialized: true,
   cookie: {
