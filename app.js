@@ -12,6 +12,8 @@ const ExpressError = require("./utils/ExpressError");
 const methodOverride = require("method-override");
 const passport = require("passport");
 const LocalStrategy = require("passport-local");
+const mongoSanitize = require("express-mongo-sanitize");
+const helmet = require("helmet");
 
 const User = require("./models/user");
 
@@ -19,7 +21,12 @@ const campgroundRoutes = require("./routes/campgrounds.routes");
 const reviewRoutes = require("./routes/reviews.routes");
 const userRoutes = require("./routes/users.routes");
 
-mongoose.connect("mongodb://localhost:27017/yelp-camp");
+const MongoStore = require("connect-mongo");
+
+const dbUrl = process.env.DB_URL;
+const localDbUrl = "mongodb://localhost:27017/yelp-camp";
+
+mongoose.connect(localDbUrl);
 
 const db = mongoose.connection;
 db.on("error", console.error.bind(console, "connection error:"));
@@ -36,19 +43,35 @@ app.set("views", path.join(__dirname, "views"));
 app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride("_method"));
 app.use(express.static(path.join(__dirname, "public")));
+app.use(mongoSanitize());
+
+const store = MongoStore.create({
+  mongoUrl: localDbUrl,
+  touchAfter: 24 * 60 * 60,
+  crypto: {
+    secret: "thisisabadsecret",
+  },
+});
+
+store.on("error", function (e) {
+  console.log("SESSION STORE ERROR", e);
+});
 
 const sessionConfig = {
+  store,
+  name: "yelpsession",
   secret: "thisisabadsecret",
   resave: false,
   saveUninitialized: true,
   cookie: {
-    httponly: true,
+    httpOnly: true,
     expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
     maxAge: 1000 * 60 * 60 * 24 * 7,
   },
 };
 app.use(session(sessionConfig));
 app.use(flash());
+app.use(helmet({ contentSecurityPolicy: false }));
 
 // Configure passport middleware
 app.use(passport.initialize());
